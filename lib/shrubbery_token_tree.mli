@@ -24,9 +24,11 @@ module Indexed : sig
 
   type root = t list [@@deriving sexp, equal, compare]
 
+  val is_trivia_token : t -> bool
   val first_token : t -> Token.ti
 end
 
+val is_trivia_token : t -> bool
 val to_indexed : t -> Indexed.t
 val of_indexed : Indexed.t -> t
 val remove_trivia : t -> t option

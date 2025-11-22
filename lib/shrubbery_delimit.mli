@@ -12,4 +12,4 @@ module Error : sig
   [@@deriving sexp]
 end
 
-val to_tree : Token.t array -> Token_tree.t list * Error.t list
+val delimit : Token.t array -> Token_tree.t list * Error.t list

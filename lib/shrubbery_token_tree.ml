@@ -32,7 +32,17 @@ module Indexed = struct
     | Token tok -> tok
     | Tree { ldelim; _ } -> ldelim
   ;;
+
+  let is_trivia_token = function
+    | Token token when Token.is_trivia token.token -> true
+    | _ -> false
+  ;;
 end
+
+let is_trivia_token = function
+  | Token token when Token.is_trivia token -> true
+  | _ -> false
+;;
 
 let rec to_indexed' tt i =
   match tt with

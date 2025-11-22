@@ -7,6 +7,16 @@ record Testing:
   first int
   second int
 
+record Testing: {
+  first int
+  second int
+}
+
+def another: {
+  let first: 1324;
+  let second int: 1234234;
+  let third int: 1231234;
+}
 
 def testing:
   first

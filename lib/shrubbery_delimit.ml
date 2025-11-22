@@ -79,7 +79,8 @@ end = struct
   let finish t = t.errors
 end
 
-let to_tree (tokens : Token.t array) : Token_tree.t list * Error.t list =
+(* TODO: turn commas at the top level into errors *)
+let delimit (tokens : Token.t array) : Token_tree.t list * Error.t list =
   (* precondition, st.tokens must not be empty *)
   let rec single st : Token_tree.t =
     match State.next st with
@@ -122,7 +123,7 @@ let to_tree (tokens : Token.t array) : Token_tree.t list * Error.t list =
 let%expect_test "smoke" =
   let check s =
     let tokens = Lexer.lex s |> Array.of_list in
-    let tts, errors = to_tree tokens in
+    let tts, errors = delimit tokens in
     print_s [%sexp (tts : Token_tree.t list)];
     print_s [%sexp (errors : Error.t list)]
   in

@@ -5,32 +5,48 @@ open struct
   module Token = Shrubbery_token
 end
 
-type group = { items : item list }
+type group =
+  { items : item list
+  ; block : colon_block option
+  ; alts : alt list
+  }
 
 and item =
   | Token of Token.t
   | Tree of
       { ldelim : Token.t
-      ; groups : group list
+      ; groups : group_sep list
       ; rdelim : Token.t
       }
 
+and colon_block =
+  { token : Token.t
+  ; block : block
+  }
+
 and block =
-  { colon : Token.t
-  ; groups : group list
+  { lbrace : Token.t
+  ; groups : group_sep list
+  ; rbrace : Token.t
+  }
+
+and group_sep =
+  { group : group
+  ; sep : Token.t option
   }
 
 and alt =
   { pipe : Token.t
-  ; groups : group list
+  ; groups : block
   }
 [@@deriving sexp, equal, compare]
 
-module Indexed = struct
+(* module Indexed = struct
   type group =
     { items : item list
     ; block : block option
     ; alts : alt list
+    ; semi : Token.ti option
     }
 
   and item =
@@ -51,4 +67,4 @@ module Indexed = struct
     ; groups : group list
     }
   [@@deriving sexp, equal, compare]
-end
+end *)
