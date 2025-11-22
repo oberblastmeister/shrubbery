@@ -12,128 +12,118 @@ type context =
   | Known_indent of int
 [@@deriving sexp, equal, compare]
 
-module State = struct
-  type t =
-    { mutable contexts : context list
-    ; mutable tts : Token_tree.t list
-    ; top_level : bool
-    }
+type st =
+  { mutable contexts : context list
+  ; mutable tts : Token_tree.t list
+  }
 
-  let create top_level = { contexts = []; tts = []; top_level }
-  let finish st = List.rev st.tts
+let create_state () = { contexts = []; tts = [] }
+let finish_state st = List.rev st.tts
 
-  let top_is st context =
-    List.hd st.contexts
-    |> Option.map ~f:(fun cx -> equal_context cx context)
-    |> Option.value ~default:false
-  ;;
+let top_is st context =
+  List.hd st.contexts
+  |> Option.map ~f:(fun cx -> equal_context cx context)
+  |> Option.value ~default:false
+;;
 
-  let add_context st context = st.contexts <- context :: st.contexts
-  let start_block st = add_context st Unknown_indent
+let add_context st context = st.contexts <- context :: st.contexts
+let start_block st = add_context st Unknown_indent
 
-  let pop_context_exn st context =
+let pop_context_exn st context =
+  let hd, tl = List.hd_exn st.contexts, List.tl_exn st.contexts in
+  assert (equal_context context hd);
+  st.contexts <- tl
+;;
+
+let add_tt st tt = st.tts <- tt :: st.tts
+
+let pop_all st =
+  while not (List.is_empty st.contexts) do
     let hd, tl = List.hd_exn st.contexts, List.tl_exn st.contexts in
-    assert (equal_context context hd);
+    if equal_context hd Unknown_indent then add_tt st (Token VLBrace);
+    add_tt st (Token VRBrace);
     st.contexts <- tl
-  ;;
+  done
+;;
 
-  let add_tt st tt = st.tts <- tt :: st.tts
-
-  let pop_all st =
-    while not (List.is_empty st.contexts) do
-      let hd, tl = List.hd_exn st.contexts, List.tl_exn st.contexts in
-      if equal_context hd Unknown_indent then add_tt st (Token VLBrace);
-      add_tt st (Token VRBrace);
-      st.contexts <- tl
-    done
-  ;;
-
-  let pop_offside ~add_semi st col =
-    let rec loop () =
-      match st.contexts with
-      | [] -> ()
-      | hd :: tl -> begin
-        let pop_block () =
-          st.contexts <- tl;
-          add_tt st (Token VRBrace);
-          loop ()
-        in
-        match hd with
-        | Known_indent col' ->
-          if col > col'
-          then ()
-          else if col = col'
+let pop_offside ~add_semi st col =
+  let rec loop () =
+    match st.contexts with
+    | [] -> ()
+    | hd :: tl -> begin
+      let pop_block () =
+        st.contexts <- tl;
+        add_tt st (Token VRBrace);
+        loop ()
+      in
+      match hd with
+      | Known_indent col' ->
+        if col > col'
+        then ()
+        else if col = col'
+        then begin
+          if add_semi then add_tt st (Token VSemi)
+        end
+        else begin
+          pop_block ()
+        end
+      | Unknown_indent -> begin
+        add_tt st (Token VLBrace);
+        match tl with
+        | Unknown_indent :: _ -> assert false
+        | Known_indent prev_col :: _ ->
+          if col > prev_col
           then begin
-            if add_semi then add_tt st (Token VSemi)
+            st.contexts <- Known_indent col :: tl
           end
           else begin
             pop_block ()
           end
-        | Unknown_indent -> begin
-          add_tt st (Token VLBrace);
-          match tl with
-          | Unknown_indent :: _ -> assert false
-          | Known_indent prev_col :: _ ->
-            if col > prev_col
-            then begin
-              st.contexts <- Known_indent col :: tl
-            end
-            else begin
-              pop_block ()
-            end
-          | [] -> st.contexts <- Known_indent col :: []
-        end
+        | [] -> st.contexts <- Known_indent col :: []
       end
-    in
-    loop ()
-  ;;
-end
+    end
+  in
+  loop ()
+;;
 
+(* precondition: 
+   commas must not appear at the top level where they are not surrounded by delimiters.
+   The Delimit module will ensure that this condition is met.
+*)
 let insert_virtual_tokens tokens tts =
   let line_cols = Token.calculate_line_col tokens in
   let rec go_inner tts =
-    let st = State.create false in
+    let st = create_state () in
     go st tts;
-    State.pop_all st;
-    let res = State.finish st in
+    pop_all st;
+    let res = finish_state st in
     res
   and go_root tts =
-    let st = State.create true in
-    State.add_tt st (Token VLBrace);
-    State.add_context st (Known_indent 0);
+    let st = create_state () in
+    add_tt st (Token VLBrace);
+    add_context st (Known_indent 0);
     go st tts;
-    State.pop_all st;
-    let res = State.finish st in
+    pop_all st;
+    let res = finish_state st in
     res
-  and go (st : State.t) (tts : Token_tree.Indexed.t list) =
+  and go (st : st) (tts : Token_tree.Indexed.t list) =
     List.iter tts ~f:(fun tt -> go_tt st tt)
   and go_tt st (tt : Token_tree.Indexed.t) =
     begin match tt with
     | Token token when Token.is_trivia token.token ->
       (* skip over trivia tokens *)
-      State.add_tt st (Token token.token)
+      add_tt st (Token token.token)
     | Token token -> begin
       let curr_lc = line_cols.(token.index) in
-      (* commas end all blocks that were started in this token tree, but not at the top level, where there are no delimiters *)
-      if Token.equal token.token Comma && not st.top_level
-      then State.pop_all st
-      else State.pop_offside st curr_lc.col ~add_semi:(not (Token.equal token.token Pipe));
-      if Token.equal token.token Comma && st.top_level
-      then begin
-        (*
-                    A comma at the top level is an error.
-                    It is essential that we convert this to an error token or else the parser will loop on commas, since commas are control characters.
-                    See the invalid comma on toplevel testcase.
-                    TODO: do this in the delimiter phase
-                  *)
-        State.add_tt st (Token (Error ","))
-      end
-      else begin
+      if Token.equal token.token Comma
+      then pop_all st
+      else pop_offside st curr_lc.col ~add_semi:(not (Token.equal token.token Pipe));
+      begin
         begin match token.token with
-        | Colon | Pipe | Equal -> State.start_block st
+        | Colon | Pipe | Equal -> start_block st
         | _ -> ()
         end;
-        State.add_tt st (Token token.token)
+        add_tt st (Token token.token)
       end
     end
     | Tree { ldelim; tts = inner_tts; rdelim } ->
@@ -142,14 +132,14 @@ let insert_virtual_tokens tokens tts =
       let tt =
         Token_tree.Tree { ldelim = ldelim.token; tts = inner_tts; rdelim = rdelim.token }
       in
-      if Token.equal ldelim.token LBrace && State.top_is st Unknown_indent
+      if Token.equal ldelim.token LBrace && top_is st Unknown_indent
       then begin
-        State.pop_context_exn st Unknown_indent
+        pop_context_exn st Unknown_indent
       end
       else begin
-        State.pop_offside st curr_lc.col ~add_semi:true
+        pop_offside st curr_lc.col ~add_semi:true
       end;
-      State.add_tt st tt
+      add_tt st tt
     end
   in
   go_root tts

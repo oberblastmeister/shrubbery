@@ -159,8 +159,8 @@ and parse_alts_rec st acc =
 
 and parse_alt st : Shrub.alt =
   let pipe = State.expect st Pipe in
-  let groups = parse_block st in
-  { pipe; groups }
+  let block = parse_block st in
+  { pipe; block }
 ;;
 
 (* precondition: 

@@ -37,6 +37,10 @@ module State : sig
   type t
 
   val create : Token.t array -> t
+
+  (*
+    we return ti here because we may use the token index in Error.t
+  *)
   val next : t -> Token.ti option
   val peek : t -> Token.ti option
   val add_error : t -> Error.t -> unit
@@ -79,43 +83,49 @@ end = struct
   let finish t = t.errors
 end
 
-(* TODO: turn commas at the top level into errors *)
+(* precondition, st.tokens must not be empty *)
+let rec single st : Token_tree.t =
+  match State.next st with
+  | None -> assert false
+  | Some t when is_left_delim t.Token.token ->
+    let ldelim = t in
+    let tts = many st false in
+    let rdelim =
+      match State.next st with
+      | None ->
+        let last_token =
+          Option.value_exn
+            ~message:"Should have last token because we matched on Some above"
+            (State.last_token st)
+        in
+        State.add_error st (Error.Expecting_delimiter last_token);
+        last_token
+      | Some t when Token.equal (to_close ldelim.token) t.Token.token -> t
+      | Some rdelim ->
+        State.add_error st (Error.Mismatching_delimiters { ldelim; rdelim });
+        rdelim
+    in
+    Token_tree.Tree { ldelim = ldelim.token; tts; rdelim = rdelim.token }
+  | Some t -> Token_tree.Token t.token
+
+and many st is_top_level = many_rec [] st is_top_level
+
+and many_rec acc st is_top_level =
+  match State.peek st with
+  | None -> List.rev acc
+  | Some t when is_right_delim t.Token.token -> List.rev acc
+  | Some { token = Comma; _ } when is_top_level ->
+    let _ = State.next st in
+    (* commas at the top levels are errors, because they are not surrounded by delimiters *)
+    many_rec (Token (Error ",") :: acc) st is_top_level
+  | Some _ ->
+    let tt = single st in
+    many_rec (tt :: acc) st is_top_level
+;;
+
 let delimit (tokens : Token.t array) : Token_tree.t list * Error.t list =
-  (* precondition, st.tokens must not be empty *)
-  let rec single st : Token_tree.t =
-    match State.next st with
-    | None -> assert false
-    | Some t when is_left_delim t.Token.token ->
-      let ldelim = t in
-      let tts = many st in
-      let rdelim =
-        match State.next st with
-        | None ->
-          let last_token =
-            Option.value_exn
-              ~message:"Should have last token because we matched on Some above"
-              (State.last_token st)
-          in
-          State.add_error st (Error.Expecting_delimiter last_token);
-          last_token
-        | Some t when Token.equal (to_close ldelim.token) t.Token.token -> t
-        | Some rdelim ->
-          State.add_error st (Error.Mismatching_delimiters { ldelim; rdelim });
-          rdelim
-      in
-      Token_tree.Tree { ldelim = ldelim.token; tts; rdelim = rdelim.token }
-    | Some t -> Token_tree.Token t.token
-  and many st = many_rec [] st
-  and many_rec acc st =
-    match State.peek st with
-    | None -> List.rev acc
-    | Some t when is_right_delim t.Token.token -> List.rev acc
-    | Some _ ->
-      let tt = single st in
-      many_rec (tt :: acc) st
-  in
   let st = State.create tokens in
-  let tts = many st in
+  let tts = many st true in
   let errors = State.finish st in
   tts, errors
 ;;

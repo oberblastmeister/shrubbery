@@ -24,71 +24,71 @@ let is_number_continue c =
 ;;
 
 let lex s =
-  let rec go (acc : Token.t list) (i : int) : Token.t list =
+  let rec lex (acc : Token.t list) (i : int) : Token.t list =
     if i >= String.length s
     then finish acc
     else begin
       match s.[i] with
-      | '(' -> go (Token.LParen :: acc) (i + 1)
-      | ')' -> go (Token.RParen :: acc) (i + 1)
-      | '[' -> go (Token.LBrack :: acc) (i + 1)
-      | ']' -> go (Token.RBrack :: acc) (i + 1)
-      | '{' -> go (Token.LBrace :: acc) (i + 1)
-      | '}' -> go (Token.RBrace :: acc) (i + 1)
-      | ',' -> go (Token.Comma :: acc) (i + 1)
-      | ':' -> go (Token.Colon :: acc) (i + 1)
-      | ';' -> go (Token.Semi :: acc) (i + 1)
-      | '.' -> go (Token.Dot :: acc) (i + 1)
-      | '"' -> go_string acc i (i + 1)
+      | '(' -> lex (Token.LParen :: acc) (i + 1)
+      | ')' -> lex (Token.RParen :: acc) (i + 1)
+      | '[' -> lex (Token.LBrack :: acc) (i + 1)
+      | ']' -> lex (Token.RBrack :: acc) (i + 1)
+      | '{' -> lex (Token.LBrace :: acc) (i + 1)
+      | '}' -> lex (Token.RBrace :: acc) (i + 1)
+      | ',' -> lex (Token.Comma :: acc) (i + 1)
+      | ':' -> lex (Token.Colon :: acc) (i + 1)
+      | ';' -> lex (Token.Semi :: acc) (i + 1)
+      | '.' -> lex (Token.Dot :: acc) (i + 1)
+      | '"' -> lex_string acc i (i + 1)
       | '=' when i + 1 >= String.length s || not (is_operator_char s.[i + 1]) ->
-        go (Token.Equal :: acc) (i + 1)
+        lex (Token.Equal :: acc) (i + 1)
       | '|' when i + 1 >= String.length s || not (is_operator_char s.[i + 1]) ->
-        go (Token.Pipe :: acc) (i + 1)
-      | ' ' -> go_whitespace acc i (i + 1)
-      | '\n' -> go (Token.Newline :: acc) (i + 1)
-      | '/' -> go_comment acc i (i + 1)
-      | '~' -> go_keyword acc i (i + 1)
-      | _ when is_number_start s.[i] -> go_number acc i (i + 1)
-      | _ when is_ident_start s.[i] -> go_ident acc i (i + 1)
-      | _ when is_operator_char s.[i] -> go_operator acc i (i + 1)
-      | c -> go (Token.Error (String.of_char c) :: acc) (i + 1)
+        lex (Token.Pipe :: acc) (i + 1)
+      | ' ' -> lex_whitespace acc i (i + 1)
+      | '\n' -> lex (Token.Newline :: acc) (i + 1)
+      | '/' -> lex_comment acc i (i + 1)
+      | '~' -> lex_keyword acc i (i + 1)
+      | _ when is_number_start s.[i] -> lex_number acc i (i + 1)
+      | _ when is_ident_start s.[i] -> lex_ident acc i (i + 1)
+      | _ when is_operator_char s.[i] -> lex_operator acc i (i + 1)
+      | c -> lex (Token.Error (String.of_char c) :: acc) (i + 1)
     end
-  and go_number acc start i =
+  and lex_number acc start i =
     let i = take_while ~f:is_number_continue i s in
-    go (Token.Number (String.sub s ~pos:start ~len:(i - start)) :: acc) i
-  and go_string acc start i =
+    lex (Token.Number (String.sub s ~pos:start ~len:(i - start)) :: acc) i
+  and lex_string acc start i =
     let i = take_while ~f:(fun c -> not (Char.equal c '"' || Char.equal c '\n')) i s in
     let content = String.sub s ~pos:(start + 1) ~len:(i - (start + 1)) in
     if i >= String.length s || Char.equal s.[i] '\n'
-    then go (Error content :: acc) i
-    else go (String content :: acc) (i + 1)
-  and go_ident acc start i =
+    then lex (Error content :: acc) i
+    else lex (String content :: acc) (i + 1)
+  and lex_ident acc start i =
     let i = take_while ~f:is_ident_continue i s in
-    go (Token.Ident (String.sub s ~pos:start ~len:(i - start)) :: acc) i
-  and go_keyword acc start i =
+    lex (Token.Ident (String.sub s ~pos:start ~len:(i - start)) :: acc) i
+  and lex_keyword acc start i =
     if i >= String.length s || not (is_ident_start s.[i])
-    then go (Token.Error (String.of_char s.[i]) :: acc) i
+    then lex (Token.Error (String.of_char s.[i]) :: acc) i
     else begin
       let i = i + 1 in
       let i = take_while ~f:is_ident_continue i s in
-      go (Token.Keyword (String.sub s ~pos:(start + 1) ~len:(i - (start + 1))) :: acc) i
+      lex (Token.Keyword (String.sub s ~pos:(start + 1) ~len:(i - (start + 1))) :: acc) i
     end
-  and go_operator acc start i =
+  and lex_operator acc start i =
     let i = take_while ~f:is_operator_char i s in
-    go (Token.Operator (String.sub s ~pos:start ~len:(i - start)) :: acc) i
-  and go_comment acc start i =
+    lex (Token.Operator (String.sub s ~pos:start ~len:(i - start)) :: acc) i
+  and lex_comment acc start i =
     if i >= String.length s || not (Char.equal s.[i] '/')
-    then go_operator acc start i
+    then lex_operator acc start i
     else begin
       let i = i + 1 in
       let i = take_while ~f:(fun c -> not (Char.equal c '\n')) i s in
-      go (Token.Comment (String.sub s ~pos:(start + 2) ~len:(i - (start + 2))) :: acc) i
+      lex (Token.Comment (String.sub s ~pos:(start + 2) ~len:(i - (start + 2))) :: acc) i
     end
-  and go_whitespace acc start i =
+  and lex_whitespace acc start i =
     let i = take_while ~f:(Char.equal ' ') i s in
-    go (Token.Whitespace (i - start) :: acc) i
+    lex (Token.Whitespace (i - start) :: acc) i
   and finish acc = List.rev acc in
-  go [] 0
+  lex [] 0
 ;;
 
 let%expect_test "smoke" =
