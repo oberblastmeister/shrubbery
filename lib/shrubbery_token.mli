@@ -28,6 +28,7 @@ type t =
   | Error of string
 [@@deriving sexp, equal, compare]
 
+val to_string : t -> string
 val length : t -> int
 val is_trivia : t -> bool
 

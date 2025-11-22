@@ -113,7 +113,13 @@ and many st is_top_level = many_rec [] st is_top_level
 and many_rec acc st is_top_level =
   match State.peek st with
   | None -> List.rev acc
-  | Some t when is_right_delim t.Token.token -> List.rev acc
+  | Some t when is_right_delim t.Token.token ->
+    if is_top_level
+    then begin
+      let _ = State.next st in
+      many_rec (Token (Error (Token.to_string t.token)) :: acc) st is_top_level
+    end
+    else List.rev acc
   | Some { token = Comma; _ } when is_top_level ->
     let _ = State.next st in
     (* commas at the top levels are errors, because they are not surrounded by delimiters *)

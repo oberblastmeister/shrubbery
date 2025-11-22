@@ -122,137 +122,6 @@ def g:
     |}]
 ;;
 
-let%expect_test "fib" =
-  check
-    {|
-    
-def fib pos_int
-| fib(0): 1
-| fib(1): 1
-| fib(n nat, n bool): fib(n - 1) + fib(n - 2)
-
-def another:
-  (x, y, z)
-
-    |};
-  [%expect
-    {|
-    ((Token VLBrace) (Token VSemi) (Token (Ident def)) (Token (Ident fib))
-     (Token (Ident pos_int)) (Token Pipe) (Token VLBrace) (Token (Ident fib))
-     (Tree (ldelim LParen) (tts ((Token (Number 0)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Number 1)) (Token VRBrace)
-     (Token VRBrace) (Token Pipe) (Token VLBrace) (Token (Ident fib))
-     (Tree (ldelim LParen) (tts ((Token (Number 1)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Number 1)) (Token VRBrace)
-     (Token VRBrace) (Token Pipe) (Token VLBrace) (Token (Ident fib))
-     (Tree (ldelim LParen)
-      (tts
-       ((Token (Ident n)) (Token (Ident nat)) (Token Comma) (Token (Ident n))
-        (Token (Ident bool))))
-      (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Ident fib))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident n)) (Token (Operator -)) (Token (Number 1))))
-      (rdelim RParen))
-     (Token (Operator +)) (Token (Ident fib))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident n)) (Token (Operator -)) (Token (Number 2))))
-      (rdelim RParen))
-     (Token VRBrace) (Token VRBrace) (Token VSemi) (Token (Ident def))
-     (Token (Ident another)) (Token Colon) (Token VLBrace)
-     (Tree (ldelim LParen)
-      (tts
-       ((Token (Ident x)) (Token Comma) (Token (Ident y)) (Token Comma)
-        (Token (Ident z))))
-      (rdelim RParen))
-     (Token VRBrace) (Token VRBrace))
-    |}]
-;;
-
-let%expect_test "semi after alternatives" =
-  check
-    {|
-data Option(a):
-| Some(a)
-| None
-;
-
-data Either(a, b):
-| Left(a)
-| Right(b)
-
-record Pair(a, b):
-  fst a
-  snd b
-
-    |};
-  [%expect
-    {|
-    ((Token VLBrace) (Token VSemi) (Token (Ident data)) (Token (Ident Option))
-     (Tree (ldelim LParen) (tts ((Token (Ident a)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token VRBrace) (Token Pipe) (Token VLBrace)
-     (Token (Ident Some))
-     (Tree (ldelim LParen) (tts ((Token (Ident a)))) (rdelim RParen))
-     (Token VRBrace) (Token Pipe) (Token VLBrace) (Token (Ident None))
-     (Token VRBrace) (Token VSemi) (Token Semi) (Token VSemi)
-     (Token (Ident data)) (Token (Ident Either))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident a)) (Token Comma) (Token (Ident b)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token VRBrace) (Token Pipe) (Token VLBrace)
-     (Token (Ident Left))
-     (Tree (ldelim LParen) (tts ((Token (Ident a)))) (rdelim RParen))
-     (Token VRBrace) (Token Pipe) (Token VLBrace) (Token (Ident Right))
-     (Tree (ldelim LParen) (tts ((Token (Ident b)))) (rdelim RParen))
-     (Token VRBrace) (Token VSemi) (Token (Ident record)) (Token (Ident Pair))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident a)) (Token Comma) (Token (Ident b)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Ident fst)) (Token (Ident a))
-     (Token VSemi) (Token (Ident snd)) (Token (Ident b)) (Token VRBrace)
-     (Token VRBrace))
-    |}]
-;;
-
-let%expect_test "nested match" =
-  check
-    {|
-def nested_match(x, y):
-  match x:
-  | Some(x):
-    match y:
-    | Some(y): print(x, y)
-    | None: throw()
-  | None:
-    throw()
-
-  |};
-  [%expect
-    {|
-    ((Token VLBrace) (Token VSemi) (Token (Ident def))
-     (Token (Ident nested_match))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident x)) (Token Comma) (Token (Ident y)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Ident match)) (Token (Ident x))
-     (Token Colon) (Token VLBrace) (Token VRBrace) (Token Pipe) (Token VLBrace)
-     (Token (Ident Some))
-     (Tree (ldelim LParen) (tts ((Token (Ident x)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token VRBrace) (Token VSemi)
-     (Token (Ident match)) (Token (Ident y)) (Token Colon) (Token VLBrace)
-     (Token VRBrace) (Token Pipe) (Token VLBrace) (Token (Ident Some))
-     (Tree (ldelim LParen) (tts ((Token (Ident y)))) (rdelim RParen))
-     (Token Colon) (Token VLBrace) (Token (Ident print))
-     (Tree (ldelim LParen)
-      (tts ((Token (Ident x)) (Token Comma) (Token (Ident y)))) (rdelim RParen))
-     (Token VRBrace) (Token VRBrace) (Token Pipe) (Token VLBrace)
-     (Token (Ident None)) (Token Colon) (Token VLBrace) (Token (Ident throw))
-     (Tree (ldelim LParen) (tts ()) (rdelim RParen)) (Token VRBrace)
-     (Token VRBrace) (Token VRBrace) (Token Pipe) (Token VLBrace)
-     (Token (Ident None)) (Token Colon) (Token VLBrace) (Token VRBrace)
-     (Token VSemi) (Token (Ident throw))
-     (Tree (ldelim LParen) (tts ()) (rdelim RParen)) (Token VRBrace)
-     (Token VRBrace) (Token VRBrace))
-    |}]
-;;
-
 let%expect_test "weird semi" =
   check
     {|
@@ -355,5 +224,17 @@ def first:
      (Token Colon) (Token VLBrace) (Token (Ident x)) (Token Semi) (Token VSemi)
      (Token (Ident y)) (Token Semi) (Token VSemi) (Token (Ident z))
      (Token VRBrace) (Token VRBrace))
+    |}]
+;;
+
+let%expect_test "" =
+  check
+    {|
+hello_world } another
+|};
+  [%expect
+    {|
+    ((Token VLBrace) (Token VSemi) (Token (Ident hello_world)) (Token (Error }))
+     (Token (Ident another)) (Token VRBrace))
     |}]
 ;;

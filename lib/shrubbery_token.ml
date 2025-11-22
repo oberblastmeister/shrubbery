@@ -62,6 +62,31 @@ let length = function
   | Error s -> String.length s
 ;;
 
+let to_string = function
+  | VSemi | VLBrace | VRBrace -> ""
+  | LParen -> "("
+  | RParen -> ")"
+  | LBrace -> "{"
+  | RBrace -> "}"
+  | LBrack -> "["
+  | RBrack -> "]"
+  | Comma -> ","
+  | Colon -> ":"
+  | Semi -> ";"
+  | Equal -> "="
+  | Pipe -> "|"
+  | Dot -> "."
+  | Newline -> "\n"
+  | Operator s -> s
+  | Comment s -> "// " ^ s
+  | Whitespace n -> String.make n ' '
+  | Ident s -> s
+  | Keyword s -> "~" ^ s
+  | String s -> "\"" ^ s ^ "\""
+  | Number s -> s
+  | Error s -> s
+;;
+
 type ti =
   { token : t
   ; index : int
